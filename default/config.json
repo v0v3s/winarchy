@@ -2,6 +2,7 @@
   "_help": "Defaults. Put only the keys you change in %USERPROFILE%\\.winarchy\\config.json, then run: winarchy apply. Reference: manual/31-dotfiles.md",
   "clock": "auto",
   "units": "auto",
+  "keyboardLayout": "auto",
   "workspaces": "auto",
   "gap": 10,
   "barHeight": 26,

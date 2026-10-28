@@ -419,6 +419,16 @@ function Get-KeybindingsText($cfg, $p) {
     $txt.Replace('{{ apps }}', "$section".TrimEnd())   # an empty file reads as $null
 }
 
+# The bar's keyboard layout (config keyboardLayout): "auto" shows it once Windows has more
+# than one layout or language to switch between, true / false always / never.
+function Test-KeyboardLayoutShown($cfg, $p) {
+    switch ("$($cfg.keyboardLayout)") {
+        'True' { return $true }
+        'False' { return $false }
+        default { return [int]$p.input.count -gt 1 }
+    }
+}
+
 function Write-ZebarPack($p, $cfg) {
     New-Item -ItemType Directory -Force $Pack | Out-Null
     $src = Join-Path $Code 'zebar\omarchy'
@@ -432,6 +442,7 @@ function Write-ZebarPack($p, $cfg) {
         "export const MENU = $((Join-Path $Code 'ahk\menu.ahk') | ConvertTo-Json);"
         "export const CLOCK_24H = $("$clock24".ToLower());"
         "export const METRIC = $("$metric".ToLower());"
+        "export const KEYBOARD_LAYOUT = $("$(Test-KeyboardLayoutShown $cfg $p)".ToLower());"
         # The background picker plays the wallpaper reveal on its monitor (lib/transition.ps1).
         "export const REVEAL = $("$($cfg.backgroundTransition -ne 'none')".ToLower());"
         # Popups under the bar (calendar) sit barHeight + gap from the top.

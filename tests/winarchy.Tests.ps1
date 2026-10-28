@@ -390,6 +390,18 @@ Describe 'Windows Snap (disableSnap)' {
     }
 }
 
+Describe 'Bar keyboard layout (keyboardLayout)' {
+    It 'auto: shown with more than one layout or language to switch between' {
+        Test-KeyboardLayoutShown @{ keyboardLayout = 'auto' } @{ input = @{ count = 2 } } | Should -BeTrue
+        Test-KeyboardLayoutShown @{ keyboardLayout = 'auto' } @{ input = @{ count = 1 } } | Should -BeFalse
+        Test-KeyboardLayoutShown @{} @{} | Should -BeFalse
+    }
+    It 'true / false: always / never, whatever is installed' {
+        Test-KeyboardLayoutShown @{ keyboardLayout = $true } @{ input = @{ count = 1 } } | Should -BeTrue
+        Test-KeyboardLayoutShown @{ keyboardLayout = $false } @{ input = @{ count = 3 } } | Should -BeFalse
+    }
+}
+
 Describe 'Bar restart' {
     # Zebar attaches to its parent's console: from `winarchy update` it would log into
     # that terminal and die with it. It must be started through (console-less) AutoHotkey.

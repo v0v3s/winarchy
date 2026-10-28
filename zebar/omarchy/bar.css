@@ -141,6 +141,7 @@ html.clear #bar { text-shadow: 0 0 3px rgba(0, 0, 0, 0.7); }
 @media (prefers-reduced-motion: reduce) { #bar.winreveal .tray img { transition: none; } }
 
 .module { cursor: pointer; }
+#keyboard { cursor: default; }   /* shows the layout, nothing to click */
 .muted { opacity: 0.5; }
 .hidden { display: none; }
 .paused { color: var(--alert); }

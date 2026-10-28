@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added: config `notGames`, process names that are never treated as games. An app installed under a game library folder (Lossless Scaling, under `steamapps\common`) was ignored by GlazeWM and floated over the tiles; listed there, it's tiled like any other window.
+- Added: the keyboard layout in the bar, left of the network icon (`US`, `CZ`, ...; hover for the full name). Shown when Windows has more than one layout or language to switch between; config `keyboardLayout` turns it on or off for good.
 
 ## 0.1.57 — 2026-10-07
 

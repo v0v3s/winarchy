@@ -45,6 +45,8 @@
           <span class="module hidden" id="bluetooth"></span>
           <!-- Quattro's omarchy.tailscale: only there once Tailscale is installed. -->
           <span class="module hidden" id="tailscale"></span>
+          <!-- The keyboard layout (config keyboardLayout): only with more than one to switch between. -->
+          <span class="module hidden" id="keyboard"></span>
           <span class="module" id="network"></span>
           <span class="module" id="audio"></span>
           <!-- Quattro's omarchy.monitor: brightness, text size, scale, displays. -->
@@ -61,7 +63,7 @@
       // zebar.mjs is a vendored copy of zebar@3 so the bar draws even offline.
       import * as zebar from './zebar.mjs';
       // Machine paths + settings, written by `winarchy apply`.
-      import { AHK, MENU, CLOCK_24H } from './env.js';
+      import { AHK, MENU, CLOCK_24H, KEYBOARD_LAYOUT } from './env.js';
 
       const ICONS = {
         logo: '\uE900',             // Omarchy logo (omarchy.ttf)
@@ -104,6 +106,7 @@
         cpu: { type: 'cpu', refreshInterval: 5000 },
         battery: { type: 'battery', refreshInterval: 30000 },
         systray: { type: 'systray' },
+        ...(KEYBOARD_LAYOUT ? { keyboard: { type: 'keyboard' } } : {}),
       });
 
       const $ = id => document.getElementById(id);
@@ -420,6 +423,16 @@
         $('cpu').title = cpu ? `CPU ${Math.round(cpu.usage)}%` : 'CPU';
       }
 
+      // The keyboard layout as its locale's region, the way Windows' own indicator names
+      // layouts (en-US -> US, cs-CZ -> CZ); the full name on hover. No provider: hidden.
+      function renderKeyboard(kb) {
+        const el = $('keyboard');
+        if (!kb?.layout) { el.classList.add('hidden'); return; }
+        el.classList.remove('hidden');
+        setText(el, kb.layout.split('-').pop().toUpperCase());
+        el.title = `Keyboard layout: ${kb.layout}`;
+      }
+
       // Quattro's omarchy.power: click = the Power panel (Super+Ctrl+P), right click = the
       // percentage next to the icon (bar-state.json, as Toggle > Battery Percentage).
       let batteryPercent = false;
@@ -442,7 +455,7 @@
       const RENDER = {
         glazewm: g => { renderWorkspaces(g); renderDisplay(g); },
         systray: renderTray, network: renderNetwork, audio: renderAudio,
-        cpu: renderCpu, battery: renderBattery,
+        cpu: renderCpu, battery: renderBattery, keyboard: renderKeyboard,
       };
       const drawn = {};
       function render() {

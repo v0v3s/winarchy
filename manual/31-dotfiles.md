@@ -52,6 +52,7 @@ It's JSON, so a `\` in a path is written `\\`. A file with a mistake in it is le
 |---|---|---|
 | `clock` | `"auto"` | `"12h"`, `"24h"`, or `"auto"` to follow your Windows region format |
 | `units` | `"auto"` | Weather in `"C"` or `"F"`; `"auto"` follows your region |
+| `keyboardLayout` | `"auto"` | The keyboard layout in the bar; `"auto"` shows it when you have more than one, `true` / `false` always / never |
 | `weather` | `true` | Weather in the bar |
 | `location` | `null` | `{ "lat": 51.5, "lon": -0.12, "name": "London" }` instead of the guess from your IP address (ipinfo.io) |
 | `backgroundDirs` | `["~\\Pictures\\Wallpapers"]` | Your own backgrounds, shown under _Mine_. See [backgrounds](39-backgrounds.md) |
