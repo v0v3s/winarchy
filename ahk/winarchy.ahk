@@ -2267,6 +2267,17 @@ if Env("captureKeys", "winarchy") = "omarchy" {
     BindUnlessUser("#+PrintScreen", (*) => SetTimer(CaptureText, -10))   ; text capture (OCR) -> clipboard
 }
 
+; CapsLock as Escape (config capsLock "escape"), for Vim / Neovim: with any modifiers held
+; too (Shift+CapsLock = Shift+Esc). Also over a fullscreen terminal, unlike compose; never
+; over a game, where CapsLock stays CapsLock. Both Shifts toggle Caps Lock.
+if Env("capsLock") = "escape" {
+    HotIf (*) => !Games.Has(WinExist("A"))
+    BindUnlessUser("*CapsLock", (*) => Send("{Blind}{Esc}"))
+    HotIf
+    Hotkey "~LShift", ComposeShift
+    Hotkey "~RShift", ComposeShift
+}
+
 ; CapsLock compose (lib\compose.ahk): emoji, em dash, name and email. Never over a game
 ; or a fullscreen app, where CapsLock stays CapsLock; both Shifts toggle Caps Lock.
 if Env("compose", "0") = "1" {

@@ -205,6 +205,7 @@ function Write-GlazeConfig([int]$monitorCount) {
         animations = ConvertTo-AnimationsYaml $cfg
         games = ConvertTo-GamesYaml (Get-GameProcesses $cfg)
         autotile_startup = ConvertTo-AutoTileStartup $cfg (Get-Paths).glazewmCli
+        toggle_workspace_on_refocus = "$($cfg.toggleWorkspaceOnRefocus -eq $true)".ToLower()
     }
     $yaml = Expand-Template (Get-Content -Raw $tplFile) $values
     if ($yaml -eq $old) { return $false }
@@ -219,6 +220,15 @@ function Write-GlazeConfig([int]$monitorCount) {
 function Get-GitIdentity([string]$key) {
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) { return '' }
     try { "$(git config --global --get $key 2>$null)".Trim() -replace '[\r\n]', '' } catch { '' }
+}
+
+# CapsLock (config capsLock): "escape" makes it Escape (Vim / Neovim), whatever compose says.
+# "auto" leaves it to compose (ahk/lib/compose.ahk), which never runs with an input method,
+# whose CapsLock switches modes. "" = CapsLock stays CapsLock.
+function Get-CapsLockMode($cfg, $p) {
+    if ($cfg.capsLock -eq 'escape') { return 'escape' }
+    if ($cfg.compose -and -not $p.input.ime) { return 'compose' }
+    ''
 }
 
 # --- AutoHotkey settings (UTF-16 so IniRead handles any user name) ------------------
@@ -274,9 +284,9 @@ function Write-AhkIni($p, $cfg) {
             # Keys your own Startup scripts have (lib/keys.ps1): BindUnlessUser leaves them be.
             userKeys = (@($p.userHotkeys.keys) | Where-Object { $_ }) -join '|'
             captureKeys = $(if ($cfg.captureKeys -eq 'omarchy') { 'omarchy' } else { 'winarchy' })
-            # CapsLock compose (ahk/lib/compose.ahk); never with an input method, whose
-            # CapsLock switches modes.
-            compose = [int]([bool]$cfg.compose -and -not $p.input.ime)
+            # What CapsLock does (Get-CapsLockMode): compose, Escape, or its own job.
+            capsLock = Get-CapsLockMode $cfg $p
+            compose = [int]((Get-CapsLockMode $cfg $p) -eq 'compose')
             composeName = Get-GitIdentity 'user.name'
             composeEmail = Get-GitIdentity 'user.email'
         }
@@ -622,7 +632,7 @@ function Test-FontInstalled([string]$family) {
     $false
 }
 
-function Set-TerminalProfiles($p) {
+function Set-TerminalProfiles($p, $cfg = @{}) {
     $file = $p.wtSettings
     if (-not $file -or -not (Test-Path $file)) { $file = New-TerminalSettings $p }
     if (-not $file) { return }
@@ -682,6 +692,7 @@ function Set-TerminalProfiles($p) {
     foreach ($w in $want) { Save-JsonItem $file 'profiles.list' $w.name }
     $wt.profiles.list = @($list) + $want
     if ($pwsh) { Set-TerminalDefaultProfile $file $wt }
+    Set-TerminalLaunchMode $file $wt $cfg.terminalLaunchMode
     Write-Json $file $wt
 }
 
@@ -692,6 +703,21 @@ function Set-TerminalProfiles($p) {
 # it was changed again since.
 $WindowsPowerShellProfile = '{61c54bbd-c2c6-5271-96e7-009a87ff44bf}'
 $PowerShellCoreProfile = '{574e775e-4f2a-5b96-ac1e-a2962a402336}'
+
+# A maximized or fullscreen Windows Terminal counts as fullscreen to GlazeWM: it isn't
+# tiled and covers the bar. Config terminalLaunchMode "auto" opens it as a normal window
+# instead (keeping "focus" mode); any of Terminal's own values ("maximized", "default", ...)
+# is written as it is, so a maximized Terminal stays possible. Uninstall puts the old one back.
+$TerminalUnmaximized = @{ maximized = 'default'; fullscreen = 'default'; maximizedFocus = 'focus'; fullscreenFocus = 'focus' }
+function Set-TerminalLaunchMode([string]$file, $wt, [string]$mode) {
+    $old = $wt.launchMode
+    $want = if ($mode -and $mode -ne 'auto') { $mode } elseif ($old) { $TerminalUnmaximized[$old] }
+    if (-not $want -or $want -eq $old) { return }
+    Save-JsonProperty $file 'launchMode'
+    $wt | Add-Member -Force -NotePropertyName launchMode -NotePropertyValue $want
+    Log "Windows Terminal: launchMode $(if ($old) { $old } else { 'unset' }) -> $want"
+}
+
 function Set-TerminalDefaultProfile([string]$file, $wt) {
     if (Test-Journaled "json|$file|defaultProfile") { return }
     $cur = $wt.defaultProfile
@@ -955,7 +981,7 @@ function Invoke-Apply([switch]$MonitorsOnly, [switch]$NoRestart, [switch]$Respli
     if ($MonitorsOnly) { return }
     Initialize-Branding
     # Profiles first: the ini names Omarchy Shell only once it exists.
-    try { Set-TerminalProfiles $p } catch { Log "terminal profiles FAILED: $($_.Exception.Message)" }
+    try { Set-TerminalProfiles $p $cfg } catch { Log "terminal profiles FAILED: $($_.Exception.Message)" }
     Write-AhkIni $p $cfg
     try { Write-WebAppIni $p } catch { Log "web app keys FAILED: $($_.Exception.Message)" }
     Write-ZebarPack $p $cfg

@@ -12,6 +12,7 @@
   "launchers": true,
   "captureKeys": "winarchy",
   "compose": false,
+  "capsLock": "auto",
   "apps": {
     "terminal": "auto",
     "browser": "auto",
@@ -51,6 +52,8 @@
   "openOnHoveredMonitor": true,
   "glazewmManaged": true,
   "focusFollowsCursor": true,
+  "toggleWorkspaceOnRefocus": false,
+  "terminalLaunchMode": "auto",
   "animations": {
     "enabled": false,
     "moveMs": 379,

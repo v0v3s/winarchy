@@ -18,8 +18,9 @@ general:
   # foreground off a fullscreen game, which then minimized itself.
   focus_follows_cursor: false
 
-  # Hyprland default: no workspace back-and-forth.
-  toggle_workspace_on_refocus: false
+  # Hyprland default: no workspace back-and-forth (config toggleWorkspaceOnRefocus). On, the
+  # key of the workspace you are on goes back to the one before, and Super+S hides the scratchpad.
+  toggle_workspace_on_refocus: {{ toggle_workspace_on_refocus }}
 
   # Off: the pointer stays where it is on workspace switches and focus changes
   # (with it on, every switch warped the cursor to the centre of the focused window).

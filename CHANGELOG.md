@@ -4,6 +4,9 @@
 
 - Added: config `notGames`, process names that are never treated as games. An app installed under a game library folder (Lossless Scaling, under `steamapps\common`) was ignored by GlazeWM and floated over the tiles; listed there, it's tiled like any other window.
 - Added: the keyboard layout in the bar, left of the network icon (`US`, `CZ`, ...; hover for the full name). Shown when Windows has more than one layout or language to switch between; config `keyboardLayout` turns it on or off for good.
+- Added: config `capsLock`: `"escape"` makes CapsLock an Esc (Vim / Neovim), modifiers included, also over a fullscreen terminal; never over a game. Both Shifts toggle Caps Lock.
+- Added: config `toggleWorkspaceOnRefocus` for GlazeWM's workspace back-and-forth (Super+S again hides the scratchpad), so it no longer takes your own copy of `glazewm.yaml.tpl`.
+- Fixed: a Windows Terminal set to open maximized (or fullscreen) counted as fullscreen to GlazeWM, wasn't tiled and covered the bar. Apply now opens it as a normal window; config `terminalLaunchMode` sets any launch mode of Terminal's own instead.
 
 ## 0.1.57 — 2026-10-07
 

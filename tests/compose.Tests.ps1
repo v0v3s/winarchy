@@ -101,6 +101,20 @@ Describe 'AutoHotkey settings' {
         $ini | Should -Match 'captureKeys=winarchy'
         $ini | Should -Match 'compose=0'
     }
+    It 'writes capsLock: escape wins over compose, auto leaves CapsLock to it' {
+        $base = @{ apps = @{ editor = 'notepad.exe'; terminal = 'auto'; browser = 'auto'; files = 'explorer.exe' }; screensaver = @{}; agentUsage = @{}; autoTiling = @{} }
+        Write-AhkIni @{ input = @{ ime = $false } } ($base + @{ compose = $true; capsLock = 'escape' })
+        $ini = Get-Content -Raw (Join-Path $Generated 'winarchy.ini')
+        $ini | Should -Match 'capsLock=escape'
+        $ini | Should -Match 'compose=0'
+        Write-AhkIni @{ input = @{ ime = $true } } ($base + @{ capsLock = 'escape' })
+        Get-Content -Raw (Join-Path $Generated 'winarchy.ini') | Should -Match 'capsLock=escape'
+        Write-AhkIni @{ input = @{ ime = $false } } ($base + @{ compose = $true; capsLock = 'auto' })
+        $ini = Get-Content -Raw (Join-Path $Generated 'winarchy.ini')
+        $ini | Should -Match 'capsLock=compose'
+        $ini | Should -Match 'compose=1'
+        Get-CapsLockMode @{ capsLock = 'auto' } @{ input = @{ ime = $false } } | Should -BeNullOrEmpty
+    }
     It 'lists the Print keys the way the layout has them' {
         Get-CaptureKeysText @{ captureKeys = 'omarchy' } | Should -Match 'Super \+ Print\s+Color picker'
         Get-CaptureKeysText @{ captureKeys = 'winarchy' } | Should -Match 'Super \+ Print\s+Full screenshot'

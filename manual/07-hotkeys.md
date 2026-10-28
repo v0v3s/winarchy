@@ -143,7 +143,7 @@ No `Print` key on your laptop? `Super + Ctrl + C` opens the capture menu.
 | `CapsLock`, then keys | Compose: `m s` 😄, `m y` 👍, `m h` ❤️ and the rest of Omarchy's, `Space Space` an em dash, `Space n` / `Space e` your name / email |
 | `Left Shift + Right Shift` | Caps Lock, while `CapsLock` composes |
 
-Compose is on for new installs (`"compose"` in your settings; see [dotfiles](31-dotfiles.md)).
+Compose is on for new installs (`"compose"` in your settings; see [dotfiles](31-dotfiles.md)). For Vim or Neovim, `"capsLock": "escape"` makes `CapsLock` an `Esc` instead.
 | `Ctrl + Esc` | The Windows Start menu |
 | `Super + Shift + Alt + R` | Reload GlazeWM's config |
 | `Super + Shift + Alt + P` | Pause / resume GlazeWM |

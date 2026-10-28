@@ -900,6 +900,14 @@ Describe 'Gaps toggled off vs a gap of 0 in config.json' {
         [void](Write-GlazeConfig 1)
         Gap | Should -Be 8
     }
+    It 'writes toggleWorkspaceOnRefocus, off unless it is true' {
+        Mock Get-Config { @{ gap = 8; barHeight = 26 } }
+        [void](Write-GlazeConfig 1)
+        Get-Content -Raw $GlazeConfig | Should -Match '(?m)^\s*toggle_workspace_on_refocus: false\s*$'
+        Mock Get-Config { @{ gap = 8; barHeight = 26; toggleWorkspaceOnRefocus = $true } }
+        [void](Write-GlazeConfig 1)
+        Get-Content -Raw $GlazeConfig | Should -Match '(?m)^\s*toggle_workspace_on_refocus: true\s*$'
+    }
 }
 
 Describe 'Windows Terminal default profile' {
@@ -917,6 +925,30 @@ Describe 'Windows Terminal default profile' {
         }
         function Undo { foreach ($e in (Read-Journal).entries) { Restore-JournalEntry $e $script:JournalDir } }
         $wsl = '{2c4de342-38b7-51cf-b940-2309a097f518}'
+    }
+    It 'opens a maximized Terminal as a normal window, and uninstall puts it back' {
+        Mock Log {}
+        $wt = New-Wt $null @()
+        $wt | Add-Member -NotePropertyName launchMode -NotePropertyValue 'maximized'
+        Write-Json $script:wtFile $wt
+        Set-TerminalLaunchMode $script:wtFile $wt 'auto'
+        $wt.launchMode | Should -Be 'default'
+        Write-Json $script:wtFile $wt
+        Undo
+        (Read-Json $script:wtFile).launchMode | Should -Be 'maximized'
+    }
+    It 'keeps focus mode, leaves other modes alone, and writes a terminalLaunchMode as it is' {
+        Mock Log {}
+        foreach ($c in @(@('maximizedFocus', 'auto', 'focus'), @('fullscreen', $null, 'default'), @('focus', 'auto', 'focus'),
+                @('default', 'maximized', 'maximized'))) {
+            $wt = New-Wt $null @()
+            $wt | Add-Member -NotePropertyName launchMode -NotePropertyValue $c[0]
+            Set-TerminalLaunchMode $script:wtFile $wt $c[1]
+            $wt.launchMode | Should -Be $c[2]
+        }
+        $wt = New-Wt $null @()
+        Set-TerminalLaunchMode $script:wtFile $wt 'auto'
+        $wt.PSObject.Properties.Name | Should -Not -Contain 'launchMode'
     }
     It 'replaces Windows PowerShell with PowerShell 7, and uninstall puts it back' {
         $wt = New-Wt $WindowsPowerShellProfile @(@{ guid = $WindowsPowerShellProfile; name = 'Windows PowerShell' })
