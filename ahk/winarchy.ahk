@@ -1624,7 +1624,8 @@ FullscreenState() {
 ; (the apply-time rules already cover games Windows knew about then). A process
 ; counts as a game if Windows' Game Bar (or config "games") knows it, its executable
 ; sits in a game library folder (config "gameDirs" + the common launchers' own), or
-; it was started (however many hops back) by Playnite.
+; it was started (however many hops back) by Playnite. Config "notGames" overrides all of
+; these (an app shipped through Steam, e.g. Lossless Scaling, is tiled like any other).
 IsGame(hwnd) {
     global Games, GameMode, GameHome
     static byPid := Map()        ; pid -> {name: game process name or "", t: when checked}
@@ -1641,7 +1642,7 @@ IsGame(hwnd) {
             path := WindowProcessPath(hwnd)
             SplitPath path, &procName
             stem := RegExReplace(procName, "i)\.exe$")
-            isGame := stem != "" && (GameNames().Has(stem) || InGameLibrary(path) || HasPlayniteAncestor(pid))
+            isGame := stem != "" && !NotGame(stem) && (GameNames().Has(stem) || InGameLibrary(path) || HasPlayniteAncestor(pid))
             byPid[pid] := {name: isGame ? stem : "", t: A_TickCount}
         }
         name := byPid[pid].name
@@ -2090,6 +2091,14 @@ GameNames() {
         if g := Trim(RegExReplace(g, "i)\.exe$"))
             names[g] := true
     return names
+}
+
+; Config "notGames": process names never taken for a game, whatever IsGame's checks say.
+NotGame(stem) {
+    for g in StrSplit(Env("notGames"), "|")
+        if Trim(RegExReplace(g, "i)\.exe$")) = stem   ; = compares case-insensitively
+            return true
+    return false
 }
 
 IsFullscreenWindow(hwnd) {

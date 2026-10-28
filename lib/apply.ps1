@@ -144,6 +144,8 @@ function Get-GameProcesses($cfg, [string[]]$exePaths) {
     $names = [Collections.Generic.SortedSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     foreach ($e in $exePaths) { if ($e) { [void]$names.Add([IO.Path]::GetFileNameWithoutExtension($e)) } }
     foreach ($g in @($cfg.games)) { if ($g) { [void]$names.Add(($g -replace '(?i)\.exe$', '')) } }
+    # config.notGames: apps you want tiled even though they look like games.
+    foreach ($g in @($cfg.notGames)) { if ($g) { [void]$names.Remove(($g -replace '(?i)\.exe$', '')) } }
     # Never apps winarchy itself manages, should Game Bar ever have been told they're games.
     @($names | Where-Object { $_ -notmatch '^(explorer|WindowsTerminal|pwsh|powershell|cmd|Code|chrome|msedge|firefox|zebar|glazewm)$' })
 }
@@ -262,6 +264,7 @@ function Write-AhkIni($p, $cfg) {
             gameMode = [int]($cfg.gameMode -ne $false)
             games = (@($cfg.games) | Where-Object { $_ }) -join '|'
             gameDirs = (@($cfg.gameDirs) | Where-Object { $_ }) -join '|'
+            notGames = (@($cfg.notGames) | Where-Object { $_ }) -join '|'
             blockMinimize = [int]($cfg.blockMinimize -ne $false)
             minimizeAllowed = (@($cfg.minimizeAllowed) | Where-Object { $_ }) -join '|'
             gameFocusGuard = [int]($cfg.gameFocusGuard -ne $false)

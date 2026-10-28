@@ -41,6 +41,7 @@
   "gameMode": true,
   "games": [],
   "gameDirs": [],
+  "notGames": [],
   "blockMinimize": true,
   "disableSnap": true,
   "minimizeAllowed": [],

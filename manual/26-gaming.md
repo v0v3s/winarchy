@@ -9,6 +9,8 @@ A tiling window manager and a game both want to control the game's window. A gam
 - Anything started by Playnite.
 - The process names you list in `"games": ["MyGame"]`.
 
+Except the process names you list in `"notGames": ["LosslessScaling"]`: apps that ship through Steam but aren't games are tiled like any other window.
+
 Playnite's fullscreen mode and Steam Big Picture are left alone too. Missed one? `Super + Ctrl + G` marks the focused window as a game by hand, and remembers it in your settings.
 
 ### While a game is in front

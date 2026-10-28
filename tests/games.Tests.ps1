@@ -17,6 +17,10 @@ Describe 'Game ignore rules' {
     It 'never lists apps winarchy manages' {
         Get-GameProcesses @{} @('C:\Windows\explorer.exe', 'C:\x\WindowsTerminal.exe', 'C:\x\Game.exe') | Should -Be @('Game')
     }
+    It 'never lists config.notGames, even from Game Bar or config.games' {
+        $exes = 'C:\Steam\steamapps\common\Lossless Scaling\LosslessScaling.exe', 'C:\x\Game.exe'
+        Get-GameProcesses @{ games = @('Tool'); notGames = @('losslessscaling', 'Tool.exe') } $exes | Should -Be @('Game')
+    }
     It 'lists nothing with gameMode off' {
         Get-GameProcesses @{ gameMode = $false; games = @('MyGame') } @('C:\x\Game.exe') | Should -BeNullOrEmpty
     }

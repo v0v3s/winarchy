@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added: config `notGames`, process names that are never treated as games. An app installed under a game library folder (Lossless Scaling, under `steamapps\common`) was ignored by GlazeWM and floated over the tiles; listed there, it's tiled like any other window.
+
 ## 0.1.57 — 2026-10-07
 
 - Fixed: the ready-made window-animation build failed to download ("the file contains a virus or potentially unwanted software") and was compiled instead, even right after Defender was told to leave it alone. The zip was unpacked into a temporary folder first, which the exclusion doesn't cover. Its files now go straight from the zip into the excluded paths.
