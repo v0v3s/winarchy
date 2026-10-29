@@ -206,6 +206,7 @@ function Write-GlazeConfig([int]$monitorCount) {
         games = ConvertTo-GamesYaml (Get-GameProcesses $cfg)
         autotile_startup = ConvertTo-AutoTileStartup $cfg (Get-Paths).glazewmCli
         toggle_workspace_on_refocus = "$($cfg.toggleWorkspaceOnRefocus -eq $true)".ToLower()
+        hide_method = Get-HideMethod $cfg
     }
     $yaml = Expand-Template (Get-Content -Raw $tplFile) $values
     if ($yaml -eq $old) { return $false }
@@ -229,6 +230,13 @@ function Get-CapsLockMode($cfg, $p) {
     if ($cfg.capsLock -eq 'escape') { return 'escape' }
     if ($cfg.compose -and -not $p.input.ime) { return 'compose' }
     ''
+}
+
+# GlazeWM's hide_method (config altTab). Cloaked windows stay in Windows' Alt+Tab, so with
+# "cloak" it lists every workspace's windows; hidden ones drop out of it, leaving the
+# workspaces on screen.
+function Get-HideMethod($cfg) {
+    if ($cfg.altTab -eq 'shown') { 'hide' } else { 'cloak' }
 }
 
 # --- AutoHotkey settings (UTF-16 so IniRead handles any user name) ------------------
@@ -280,7 +288,10 @@ function Write-AhkIni($p, $cfg) {
             gameFocusGuard = [int]($cfg.gameFocusGuard -ne $false)
             openOnHoveredMonitor = [int]($cfg.openOnHoveredMonitor -ne $false)
             focusFollowsCursor = [int]($cfg.focusFollowsCursor -ne $false)
-            autoTiling = [int]($cfg.autoTiling.enabled -ne $false)
+            # lib/autotile-watch.ps1 runs for auto-tiling or stacked workspaces (AutoTileGuard).
+            autoTiling = [int](($cfg.autoTiling.enabled -ne $false) -or @(Get-StackedWorkspaces $cfg).Count)
+            # Other workspaces' windows hidden instead of cloaked (config altTab "shown").
+            hideMethod = Get-HideMethod $cfg
             # Keys your own Startup scripts have (lib/keys.ps1): BindUnlessUser leaves them be.
             userKeys = (@($p.userHotkeys.keys) | Where-Object { $_ }) -join '|'
             captureKeys = $(if ($cfg.captureKeys -eq 'omarchy') { 'omarchy' } else { 'winarchy' })

@@ -49,12 +49,66 @@ function Test-TileFullSize($win, [long]$style) {
     $win.state.type -eq 'fullscreen' -and -not $win.state.maximized -and ($style -band 0x40000) -ne 0
 }
 
+# --- Stacked workspaces (config stackedWorkspaces) ---------------------------------------
+# Windows stacked on top of each other, each filling the workspace, the way Windows itself
+# keeps them: Alt+Tab (or a click) brings one to the front. GlazeWM has no monocle/stacked
+# layout, so the watcher floats every window on such a workspace at the workspace's own
+# rectangle - exactly where a lone tiled window sits, gaps and bar included.
+
+# The workspace names from config, as strings (JSON may hold them as numbers).
+function Get-StackedWorkspaces($cfg) {
+    @($cfg.stackedWorkspaces) | Where-Object { "$_" } | ForEach-Object { "$_" }
+}
+
+function Test-FillsWorkspace($win, $ws) {
+    $win.x -eq $ws.x -and $win.y -eq $ws.y -and $win.width -eq $ws.width -and $win.height -eq $ws.height
+}
+
+# Floating windows that already fill a stacked workspace: floated by an earlier watcher, so
+# they are ours to tile again when they leave it. Asked once, when the watcher starts.
+function Get-StackedOwned($workspaces, [string[]]$stacked) {
+    foreach ($ws in $workspaces) {
+        if ($stacked -notcontains "$($ws.name)") { continue }
+        foreach ($win in Get-WorkspaceWindows $ws) {
+            if ($win.state.type -eq 'floating' -and (Test-FillsWorkspace $win $ws)) { $win.id }
+        }
+    }
+}
+
+# Every window in a workspace's tree (splits hold the tiled ones).
+function Get-WorkspaceWindows($ws) {
+    foreach ($c in $ws.children) {
+        if ($c.type -eq 'window') { $c } else { Get-WorkspaceWindows $c }
+    }
+}
+
+# What to do to keep stacked workspaces stacked. $workspaces is `query workspaces`'
+# .data.workspaces; $ours holds the ids of windows floated here before. Returns
+#   @{ id; action = 'float'; x; y; width; height }  a tiled window on a stacked workspace,
+#                                                    or one of ours that no longer fits it
+#   @{ id; action = 'tile' }                         one of ours moved to a normal workspace
+# Other floating windows (dialogs, Super+O) and fullscreen ones are left alone.
+function Get-StackedFixes($workspaces, [string[]]$stacked, $ours) {
+    foreach ($ws in $workspaces) {
+        $isStacked = $stacked -contains "$($ws.name)"
+        foreach ($win in Get-WorkspaceWindows $ws) {
+            $fits = Test-FillsWorkspace $win $ws
+            $mine = $win.state.type -eq 'floating' -and $ours.Contains($win.id)
+            if ($isStacked -and ($win.state.type -eq 'tiling' -or ($mine -and -not $fits))) {
+                @{ id = $win.id; action = 'float'; x = $ws.x; y = $ws.y; width = $ws.width; height = $ws.height }
+            } elseif (-not $isStacked -and $mine) {
+                @{ id = $win.id; action = 'tile' }
+            }
+        }
+    }
+}
+
 # The extra `startup_commands` entry for GlazeWM's config (empty when off, so nothing is
 # added to the list). $cli is the currently-selected GlazeWM CLI path (official install,
 # or the animations-fork build -- see Get-SelectedGlazeWM in lib/animations.ps1), passed
 # through so the watcher always talks to whichever GlazeWM is actually running.
 function ConvertTo-AutoTileStartup($cfg, [string]$cli) {
-    if (-not $cfg.autoTiling.enabled -or -not $cli) { return '' }
+    if (-not ($cfg.autoTiling.enabled -or @(Get-StackedWorkspaces $cfg).Count) -or -not $cli) { return '' }
     # A YAML single-quoted string: an apostrophe in a path (a user name like O'Brien) is ''.
     $script = (Join-Path $Code 'lib\autotile-watch.ps1') -replace "'", "''"
     $cli = $cli -replace "'", "''"

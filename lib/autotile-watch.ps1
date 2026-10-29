@@ -25,9 +25,10 @@
   make them all act on the same, by-then-most-recent window instead of their own --
   repeatedly re-toggling it and leaving earlier windows unwrapped (this was the first cut
   of this script's bug, surfacing as focus/cursor seeming to "stick" to the last window
-  created during a burst). Only window_managed and window_unmanaged are subscribed to, not
-  focus_changed -- reacting to a later refocus of an already-wrapped window would nest it
-  again on every alt-tab. After either event, a workspace left with one window or none
+  created during a burst). Only window_managed wraps, and focus_changed isn't subscribed to
+  -- reacting to a later refocus of an already-wrapped window would nest it again on every
+  alt-tab. (The move, workspace and monitor events are for stacked workspaces, see
+  Get-StackedFixes in lib/autotile.ps1.) After each event, a workspace left with one window or none
   goes back to its monitor's split direction (Repair-Directions): closing the window next
   to a dwindle split makes GlazeWM hand the split's direction to the workspace itself.
 
@@ -91,7 +92,7 @@ function Find-Parent($roots, [string]$childId) {
     }
 }
 
-function Invoke-DwindleWrap($win) {
+function Invoke-DwindleWrap($win, [bool]$wrap) {
     if (-not $win -or $win.type -ne 'window' -or -not $win.id) { return }
     $short = $win.id.Substring(0, 8)
     # The event can arrive a beat before the tree shows the window, so look twice.
@@ -110,6 +111,7 @@ function Invoke-DwindleWrap($win) {
         $workspaces = try { (& $Cli query workspaces | ConvertFrom-Json).data.workspaces } catch { $null }
         if (-not $workspaces -or -not ($live = Find-Container $workspaces $win.id)) { return }
     }
+    if (-not $wrap) { return }            # running for stacked workspaces, auto-tiling off
     if ($live.state.type -ne 'tiling') { Log "autotile: $short is $($live.state.type), left alone"; return }
     $parent = Find-Parent $workspaces $win.id
     if (-not $parent) { Log "autotile: $short has no parent container"; return }
@@ -129,17 +131,55 @@ function Repair-Directions {
     }
 }
 
+# Stacked workspaces (Get-StackedFixes in lib/autotile.ps1): windows floated to fill them.
+$Ours = [Collections.Generic.HashSet[string]]::new()
+
+function Sync-Stacked([string[]]$stacked) {
+    if (-not $stacked -and -not $Ours.Count) { return }
+    $workspaces = try { (& $Cli query workspaces | ConvertFrom-Json).data.workspaces } catch { $null }
+    if (-not $workspaces) { return }
+    foreach ($f in @(Get-StackedFixes $workspaces $stacked $Ours)) {
+        if ($f.action -eq 'float') {
+            & $Cli command --id $f.id set-floating --shown-on-top=false --centered=false `
+                --x-pos $f.x --y-pos $f.y --width $f.width --height $f.height 2>$null | Out-Null
+            [void]$Ours.Add($f.id)
+            Log "autotile: $($f.id.Substring(0, 8)) stacked"
+        } else {
+            & $Cli command --id $f.id set-tiling 2>$null | Out-Null
+            [void]$Ours.Remove($f.id)
+            Log "autotile: $($f.id.Substring(0, 8)) left a stacked workspace, tiled"
+        }
+    }
+}
+
 Log "autotile: watching (cli: $Cli)"
-Repair-Directions
+$cfg = Get-Config
+$stacked = @(Get-StackedWorkspaces $cfg)
+if ($stacked) {
+    $workspaces = try { (& $Cli query workspaces | ConvertFrom-Json).data.workspaces } catch { $null }
+    foreach ($id in @(Get-StackedOwned $workspaces $stacked)) { [void]$Ours.Add($id) }
+}
+Sync-Stacked $stacked
+if ($cfg.autoTiling.enabled) { Repair-Directions }
 # Anything that ends this process should say why: it has been seen to disappear while
 # GlazeWM kept running, and a dead watcher silently stops new windows dwindling.
 try {
-    & $Cli sub -e window_managed window_unmanaged | ForEach-Object {
+    # Opening and closing for dwindle; for stacked workspaces also moves, workspace switches
+    # and monitor changes (a window sent to or from one, a workspace taken to another monitor).
+    & $Cli sub -e window_managed window_unmanaged focused_container_moved workspace_activated workspace_updated monitor_added monitor_removed monitor_updated | ForEach-Object {
         try {
             $evt = $_ | ConvertFrom-Json
             if ($evt.success -ne $false) {
-                if ($evt.data.managedWindow) { Invoke-DwindleWrap $evt.data.managedWindow }
-                Repair-Directions
+                # Read every time: a config change applies without restarting the watcher.
+                $cfg = Get-Config
+                # Before dwindle, which then leaves a window floated here alone. Twice: the
+                # event can come a beat before the tree shows a moved window on its new workspace.
+                $stacked = @(Get-StackedWorkspaces $cfg)
+                Sync-Stacked $stacked
+                if ($stacked) { Start-Sleep -Milliseconds 150; Sync-Stacked $stacked }
+                $dwindle = [bool]$cfg.autoTiling.enabled
+                if ($evt.data.managedWindow) { Invoke-DwindleWrap $evt.data.managedWindow $dwindle }
+                if ($dwindle) { Repair-Directions }
             }
         } catch { Log "autotile: event handling failed: $_" }
     }

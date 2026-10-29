@@ -6,6 +6,8 @@
 - Added: the keyboard layout in the bar, left of the network icon (`US`, `CZ`, ...; hover for the full name). Shown when Windows has more than one layout or language to switch between; config `keyboardLayout` turns it on or off for good.
 - Added: config `capsLock`: `"escape"` makes CapsLock an Esc (Vim / Neovim), modifiers included, also over a fullscreen terminal; never over a game. Both Shifts toggle Caps Lock.
 - Added: config `toggleWorkspaceOnRefocus` for GlazeWM's workspace back-and-forth (Super+S again hides the scratchpad), so it no longer takes your own copy of `glazewm.yaml.tpl`.
+- Added: config `stackedWorkspaces`, workspaces whose windows stack like on plain Windows instead of tiling: each fills the workspace (bar and gaps kept) and Alt+Tab or a click brings one to the front. For remote desktops, meetings, a pile of editor windows.
+- Added: config `altTab`: `"shown"` makes Alt+Tab list only the windows on the workspaces on screen (GlazeWM hides the others instead of cloaking them).
 - Fixed: a Windows Terminal set to open maximized (or fullscreen) counted as fullscreen to GlazeWM, wasn't tiled and covered the bar. Apply now opens it as a normal window; config `terminalLaunchMode` sets any launch mode of Terminal's own instead.
 
 ## 0.1.57 — 2026-10-07

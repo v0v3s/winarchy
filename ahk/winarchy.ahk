@@ -174,14 +174,19 @@ if GameFocusGuard
 OnExit UnhookForeground
 ; GlazeWM ignores games, so it never hides one when you switch away from its workspace:
 ; GameWorkspaceSync does (see "Games stay on their workspace"). Woken by focus changes and
-; by GlazeWM cloaking/uncloaking windows (hide_method: cloak) - only while a game is open.
+; by GlazeWM cloaking/uncloaking windows (hide_method: cloak), or showing/hiding them (hide,
+; config altTab "shown") - only while a game is open.
 WorkspaceHooks := []
 if GameMode {
     cb := CallbackCreate(OnWorkspaceEvent, "F", 7)
     WorkspaceHooks.Push(DllCall("SetWinEventHook", "uint", 0x0003, "uint", 0x0003, "ptr", 0, "ptr", cb
         , "uint", 0, "uint", 0, "uint", 0x0002, "ptr"))   ; EVENT_SYSTEM_FOREGROUND, WINEVENT_SKIPOWNPROCESS
-    WorkspaceHooks.Push(DllCall("SetWinEventHook", "uint", 0x8017, "uint", 0x8018, "ptr", 0, "ptr", cb
-        , "uint", 0, "uint", 0, "uint", 0x0002, "ptr"))   ; EVENT_OBJECT_CLOAKED..UNCLOAKED
+    if Env("hideMethod", "cloak") = "hide"
+        WorkspaceHooks.Push(DllCall("SetWinEventHook", "uint", 0x8002, "uint", 0x8003, "ptr", 0, "ptr", cb
+            , "uint", 0, "uint", 0, "uint", 0x0002, "ptr"))   ; EVENT_OBJECT_SHOW..HIDE
+    else
+        WorkspaceHooks.Push(DllCall("SetWinEventHook", "uint", 0x8017, "uint", 0x8018, "ptr", 0, "ptr", cb
+            , "uint", 0, "uint", 0, "uint", 0x0002, "ptr"))   ; EVENT_OBJECT_CLOAKED..UNCLOAKED
 }
 OnExit UnhookWorkspace
 ; A new window opens on the monitor under the mouse, not on Windows' primary display
@@ -225,7 +230,7 @@ OnMessage 0x5558, (*) => WorkMonitor()   ; menu.ahk / OSDs asking (see WorkingMo
 ; Focus switches as soon as the pointer touches another window.
 if Env("focusFollowsCursor", "1") = "1"
     SetTimer FocusFollowWatch, 30
-; Keep the dwindle auto-tiling watcher alive (see AutoTileGuard).
+; Keep the auto-tiling watcher alive (see AutoTileGuard); it also keeps stacked workspaces.
 if Env("autoTiling", "1") = "1"
     SetTimer AutoTileGuard, 5000
 WriteIndicators()
@@ -1582,12 +1587,14 @@ CoveredMonitors() {
 ; fullscreen), not one that only fills the monitor. With the taskbar hidden a maximized
 ; window fills it too: one that keeps its resizable frame (Super+Alt+F full width, a
 ; double-clicked title bar) is maximized, not fullscreen - going fullscreen drops the
-; frame. Never: windows on another workspace (cloaked), tool and no-activate windows (the
-; wallpaper reveal, overlays), and the shell's own full-monitor surfaces (Start, Search,
-; Alt+Tab, Task View), which come and go in a moment and would only blink the bar.
+; frame. Never: windows on another workspace (cloaked, or hidden with config altTab "shown"),
+; tool and no-activate windows (the wallpaper reveal, overlays), and the shell's own
+; full-monitor surfaces (Start, Search, Alt+Tab, Task View), which come and go in a moment
+; and would only blink the bar.
 CoversBar(hwnd) {
     try {
-        if IsCloaked(hwnd) || WinGetExStyle(hwnd) & 0x08000080       ; WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
+        if IsCloaked(hwnd) || !DllCall("IsWindowVisible", "ptr", hwnd)
+            || WinGetExStyle(hwnd) & 0x08000080                         ; WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
             return false
         if WinGetMinMax(hwnd) = 1 && WinGetStyle(hwnd) & 0x40000      ; WS_THICKFRAME
             return false

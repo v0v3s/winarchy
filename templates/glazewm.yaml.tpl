@@ -28,7 +28,9 @@ general:
     enabled: false
     trigger: 'window_focus'
 
-  hide_method: 'cloak'
+  # How windows on a workspace that isn't shown are hidden (config altTab). 'cloak' keeps
+  # them in Alt+Tab; 'hide' leaves Alt+Tab with only the workspaces on screen.
+  hide_method: '{{ hide_method }}'
   show_all_in_taskbar: false
 
 gaps:

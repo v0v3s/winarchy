@@ -908,6 +908,14 @@ Describe 'Gaps toggled off vs a gap of 0 in config.json' {
         [void](Write-GlazeConfig 1)
         Get-Content -Raw $GlazeConfig | Should -Match '(?m)^\s*toggle_workspace_on_refocus: true\s*$'
     }
+    It 'hides other workspaces'' windows for altTab "shown", cloaks them otherwise' {
+        Mock Get-Config { @{ gap = 8; barHeight = 26 } }
+        [void](Write-GlazeConfig 1)
+        Get-Content -Raw $GlazeConfig | Should -Match "(?m)^\s*hide_method: 'cloak'\s*$"
+        Mock Get-Config { @{ gap = 8; barHeight = 26; altTab = 'shown' } }
+        [void](Write-GlazeConfig 1)
+        Get-Content -Raw $GlazeConfig | Should -Match "(?m)^\s*hide_method: 'hide'\s*$"
+    }
 }
 
 Describe 'Windows Terminal default profile' {
@@ -1111,6 +1119,52 @@ Describe 'Auto-tiling: split direction and full-size windows' {
         $max = [pscustomobject]@{ state = [pscustomobject]@{ type = 'fullscreen'; maximized = $true } }
         Test-TileFullSize $max 0x16CF0000 | Should -BeFalse
         Test-TileFullSize ([pscustomobject]@{ state = [pscustomobject]@{ type = 'tiling' } }) 0x16CF0000 | Should -BeFalse
+    }
+}
+
+Describe 'Stacked workspaces' {
+    BeforeAll {
+        . "$root\lib\autotile.ps1"
+        $rect = @{ x = 10; y = 36; width = 3420; height = 1394 }
+        $win = { param($id, $state = 'tiling', $r = @{ x = 10; y = 36; width = 1705; height = 1394 })
+            [pscustomobject]@{ type = 'window'; id = $id; state = [pscustomobject]@{ type = $state }; x = $r.x; y = $r.y; width = $r.width; height = $r.height } }
+        $ws = { param($name, $kids) [pscustomobject]@{ type = 'workspace'; name = $name; x = 10; y = 36; width = 3420; height = 1394; children = @($kids) } }
+        $set = { param([string[]]$ids) $h = [Collections.Generic.HashSet[string]]::new(); foreach ($i in $ids) { [void]$h.Add($i) }; , $h }
+    }
+    It 'reads workspace names as strings, numbers included' {
+        @(Get-StackedWorkspaces @{ stackedWorkspaces = @(1, '6', '') }) | Should -Be @('1', '6')
+        @(Get-StackedWorkspaces @{}) | Should -HaveCount 0
+    }
+    It 'floats tiled windows on a stacked workspace to fill it, splits included' {
+        $split = [pscustomobject]@{ type = 'split'; children = @((& $win 'b')) }
+        $fixes = @(Get-StackedFixes @((& $ws 1 @((& $win 'a'), $split)), (& $ws 2 @((& $win 'c')))) @('1') (& $set))
+        $fixes.id | Should -Be @('a', 'b')
+        $fixes[0].action | Should -Be 'float'
+        $fixes[0].x, $fixes[0].y, $fixes[0].width, $fixes[0].height | Should -Be @(10, 36, 3420, 1394)
+    }
+    It 'refits only its own floating windows, and leaves dialogs and fullscreen alone' {
+        $wss = @(& $ws '1' @((& $win 'mine' 'floating' @{ x = 0; y = 0; width = 800; height = 600 }),
+                (& $win 'dialog' 'floating' @{ x = 0; y = 0; width = 800; height = 600 }),
+                (& $win 'fits' 'floating' $rect), (& $win 'full' 'fullscreen')))
+        $fixes = @(Get-StackedFixes $wss @('1') (& $set 'mine', 'fits'))
+        $fixes.id | Should -Be @('mine')
+    }
+    It 'tiles its own windows that left a stacked workspace, not ones floated by hand' {
+        $wss = @(& $ws '3' @((& $win 'moved' 'floating' $rect), (& $win 'byhand' 'floating' $rect), (& $win 't')))
+        $fixes = @(Get-StackedFixes $wss @('1') (& $set 'moved'))
+        $fixes.id | Should -Be @('moved')
+        $fixes[0].action | Should -Be 'tile'
+    }
+    It 'claims floating windows that already fill a stacked workspace when the watcher starts' {
+        $wss = @((& $ws '1' @((& $win 'a' 'floating' $rect), (& $win 'b' 'floating' @{ x = 0; y = 0; width = 9; height = 9 }))),
+            (& $ws '3' @((& $win 'c' 'floating' $rect))))
+        @(Get-StackedOwned $wss @('1')) | Should -Be @('a')
+    }
+    It 'starts the watcher for stacked workspaces even with auto-tiling off' {
+        $Code = 'C:\winarchy'
+        ConvertTo-AutoTileStartup @{ autoTiling = @{ enabled = $false } } 'C:\cli\glazewm.exe' | Should -Be ''
+        ConvertTo-AutoTileStartup @{ autoTiling = @{ enabled = $false }; stackedWorkspaces = @('1') } 'C:\cli\glazewm.exe' |
+            Should -BeLike '*autotile-watch.ps1*'
     }
 }
 
