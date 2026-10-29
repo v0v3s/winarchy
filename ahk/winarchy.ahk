@@ -199,6 +199,14 @@ HoverHold := 0                    ; > 0 while a placement is in flight: sampling
 HoverHoldUntil := 0               ; absolute backstop for the hold
 PrePlaceTarget := Map()          ; new window -> monitor point it belongs on (see PrePlaceOnShow)
 PrePlaceHook := 0
+; Windows already placed, or open before this script started. The shell reports a window as
+; created again whenever it is shown again - with GlazeWM's hide_method 'hide' (config altTab
+; "shown"), on every workspace switch - and a window seen before is not a new one to place.
+SeenWindows := Map()
+DetectHiddenWindows true
+for hwnd in WinGetList()
+    SeenWindows[hwnd] := true
+DetectHiddenWindows false
 ; Every new window also gets checked for opening full-size over the bar (HoverPlaceWindow),
 ; so the shell hook is there even with openOnHoveredMonitor off.
 DllCall("RegisterShellHookWindow", "ptr", A_ScriptHwnd)
@@ -3269,8 +3277,10 @@ HoverRelease() {
 }
 
 OnShellHook(wParam, lParam, *) {
-    global HoverHold, HoverHoldUntil, PrePlaceTarget
+    global HoverHold, HoverHoldUntil, PrePlaceTarget, SeenWindows
     if (wParam & 0x7FFF) != 1                ; HSHELL_WINDOWCREATED
+        return
+    if SeenWindows.Has(lParam)               ; shown again (another workspace), not new
         return
     HoverHold++
     HoverHoldUntil := A_TickCount + 2500
@@ -3346,17 +3356,25 @@ HoverTarget() {
 ; hook) so nothing blocks the shell, and retries while GlazeWM has yet to take the window
 ; under management - the shell hook fires before it does, so the first GlazeWindowInfo
 ; always misses.
-HoverPlaceWindow(hwnd, attempt, pt) {
-    global HoverPlace, GlazeCli
+HoverPlaceWindow(hwnd, attempt, pt, hiddenFor := 0) {
+    global HoverPlace, GlazeCli, SeenWindows
     PerMonitorDpi()
     again := false                           ; too early to tell: look again in a moment
+    hidden := false
     try {
         if !DllCall("IsWindow", "ptr", hwnd)
             throw Error("gone")
         if !(WinGetStyle(hwnd) & 0x10000000) {   ; WS_VISIBLE: the hook can beat the first paint
-            again := true
+            hidden := true                   ; and Electron apps (Tabby, Slack) show seconds later
             throw Error("not shown yet")
         }
+        ; Placed once: shown again later (a workspace switch with hide_method 'hide') is no
+        ; new window. Pruned of closed ones now and then; handles get reused.
+        SeenWindows[hwnd] := true
+        if SeenWindows.Count > 512
+            for h in [SeenWindows*]
+                if !DllCall("IsWindow", "ptr", h)
+                    SeenWindows.Delete(h)
         ; Owned windows and tool windows keep their parent's monitor: a Save/Print
         ; dialog belongs next to the window that opened it, not under the mouse.
         if !IsRestorableWindow(hwnd) || IsGame(hwnd)
@@ -3405,7 +3423,9 @@ HoverPlaceWindow(hwnd, attempt, pt) {
         if !target || target = current
             throw Error("already there")     ; no pointless move (and no move animation)
     } catch {
-        if again && attempt < 8              ; ~1.3 s, then give up
+        if hidden && hiddenFor < 66          ; not shown yet: up to ~10 s, attempts kept for later
+            SetTimer HoverPlaceWindow.Bind(hwnd, attempt, pt, hiddenFor + 1), -150
+        else if again && attempt < 8         ; ~1.3 s, then give up
             SetTimer HoverPlaceWindow.Bind(hwnd, attempt + 1, pt), -150
         else
             HoverRelease()
