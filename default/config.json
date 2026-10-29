@@ -50,6 +50,8 @@
   "gameFocusGuard": true,
   "gameHelper": true,
   "openOnHoveredMonitor": true,
+  "newWindowsOn": "hovered",
+  "workspaceApps": {},
   "glazewmManaged": true,
   "focusFollowsCursor": true,
   "toggleWorkspaceOnRefocus": false,

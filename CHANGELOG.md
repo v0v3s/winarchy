@@ -8,6 +8,8 @@
 - Added: config `toggleWorkspaceOnRefocus` for GlazeWM's workspace back-and-forth (Super+S again hides the scratchpad), so it no longer takes your own copy of `glazewm.yaml.tpl`.
 - Added: config `stackedWorkspaces`, workspaces whose windows stack like on plain Windows instead of tiling: each fills the workspace (bar and gaps kept) and Alt+Tab or a click brings one to the front. For remote desktops, meetings, a pile of editor windows.
 - Added: config `altTab`: `"shown"` makes Alt+Tab list only the windows on the workspaces on screen (GlazeWM hides the others instead of cloaking them).
+- Added: config `newWindowsOn`: `"focused"` opens a new window on the workspace you are focused on, not the monitor under the mouse (keyboard first); `"primary"` leaves it where Windows puts it.
+- Added: config `workspaceApps`, apps' own workspaces by process name (`{ "4": ["zen"] }`): their windows open there and focus follows; dialogs and popups stay with their window.
 - Fixed: a Windows Terminal set to open maximized (or fullscreen) counted as fullscreen to GlazeWM, wasn't tiled and covered the bar. Apply now opens it as a normal window; config `terminalLaunchMode` sets any launch mode of Terminal's own instead.
 
 ## 0.1.57 — 2026-10-07

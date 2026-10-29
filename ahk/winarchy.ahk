@@ -2100,6 +2100,23 @@ GameNames() {
     return names
 }
 
+; Config "workspaceApps": the workspace an app's windows open on, "" for none. The ini has
+; it as name:workspace|... (process names without .exe; = compares case-insensitively).
+AppWorkspace(hwnd) {
+    static apps := ""
+    if apps = "" {
+        apps := Map(), apps.CaseSense := false
+        for pair in StrSplit(Env("workspaceApps"), "|")
+            if i := InStr(pair, ":")
+                apps[SubStr(pair, 1, i - 1)] := SubStr(pair, i + 1)
+    }
+    try {
+        stem := RegExReplace(WindowProcessName(hwnd), "i)\.exe$")
+        return apps.Has(stem) ? apps[stem] : ""
+    }
+    return ""
+}
+
 ; Config "notGames": process names never taken for a game, whatever IsGame's checks say.
 NotGame(stem) {
     for g in StrSplit(Env("notGames"), "|")
@@ -2988,13 +3005,13 @@ GlazeWindowInfo(hwnd, json := "") {
     id := "", ws := "", wpos := 0, p := 1
     while p := RegExMatch(head, '"type":"window","id":"([^"]+)"', &m, p)
         id := m[1], wpos := p, p += m.Len
-    p := 1
-    while p := RegExMatch(head, '"type":"workspace","id":"([^"]+)"', &m, p)
-        ws := m[1], p += m.Len
+    p := 1, wsName := ""
+    while p := RegExMatch(head, '"type":"workspace","id":"([^"]+)","name":"([^"]*)"', &m, p)
+        ws := m[1], wsName := m[2], p += m.Len
     state := RegExMatch(head, '"state":\{"type":"(\w+)"', &m, wpos) ? m[1] : ""
     if !id
         return 0
-    info := {id: id, state: state, workspace: ws, x: 0, y: 0, w: 0, h: 0}
+    info := {id: id, state: state, workspace: ws, workspaceName: wsName, x: 0, y: 0, w: 0, h: 0}
     ; Where GlazeWM lays the window out (physical px), which can differ from where it is
     ; this instant: a new window is moved there a moment after it is managed.
     if RegExMatch(json, '"width":(-?\d+),"height":(-?\d+),"x":(-?\d+),"y":(-?\d+)', &m, wpos)
@@ -3257,8 +3274,9 @@ OnShellHook(wParam, lParam, *) {
         return
     HoverHold++
     HoverHoldUntil := A_TickCount + 2500
-    PrePlaceTarget[lParam] := HoverTarget()   ; fixed now, before the window can move the pointer
-    SetTimer HoverPlaceWindow.Bind(lParam, 1, HoverTarget()), -120
+    target := HoverTarget()                   ; fixed now, before the window can move the pointer
+    PrePlaceTarget[lParam] := target          ; or take the focus
+    SetTimer HoverPlaceWindow.Bind(lParam, 1, target), -120
 }
 
 ; A new window is created wherever Windows likes (usually the primary monitor) and only
@@ -3283,6 +3301,8 @@ PrePlaceOnShow(hWinEventHook, event, hwnd, idObject, idChild, *) {
             return
         if !IsRestorableWindow(hwnd) || !FocusFollowEligible(hwnd) || WinGetMinMax(hwnd) != 0
             return
+        if AppWorkspace(hwnd) != ""                ; has a workspace of its own (HoverPlaceWindow)
+            return
         dst := MonitorFromPoint(pt.x, pt.y)
         src := MonitorOfWindow(hwnd)
         if !dst || dst = src
@@ -3306,8 +3326,13 @@ UnhookPrePlace(*) {
 
 ; Where a new window belongs, fixed as it appears: the hovered point, or - when keyboard
 ; focus moved to another monitor since the pointer last moved - the middle of that one.
+; Config newWindowsOn "focused": the middle of GlazeWM's focused window or workspace
+; instead, wherever the pointer is (the new window isn't managed yet, so not focused).
 HoverTarget() {
     global HoverPoint, KeyMonitor, KeyMonitorAt, PointerMovedAt
+    if Env("newWindowsOn", "hovered") = "focused"
+        && RegExMatch(GlazeQuery("focused"), '"width":(\d+),"height":(\d+),"x":(-?\d+),"y":(-?\d+)', &m)
+        return {x: Integer(m[3]) + Integer(m[1]) // 2, y: Integer(m[4]) + Integer(m[2]) // 2}
     if KeyMonitorAt > PointerMovedAt && KeyMonitor >= 1 && KeyMonitor <= MonitorGetCount() {
         MonitorGet KeyMonitor, &l, &t, &r, &b
         return {x: (l + r) // 2, y: (t + b) // 2}
@@ -3358,6 +3383,19 @@ HoverPlaceWindow(hwnd, attempt, pt) {
         ; app frames such as Settings): looked at again once GlazeWM had its go.
         if info.state = "tiling" && WinGetMinMax(hwnd) = 1
             SetTimer FixMaximizedTile.Bind(hwnd), -400
+        ; Config workspaceApps: the app's own workspace, and you go along (Hyprland's
+        ; windowrule workspace). Owned and tool windows never get here (IsRestorableWindow
+        ; above), so a dialog or a call notification stays with the window that opened it.
+        if (ws := AppWorkspace(hwnd)) != "" {
+            if info.workspaceName != ws {
+                RunWait('"' GlazeCli '" command --id ' info.id ' move --workspace ' ws, , "Hide")
+                ; The window, not "focus --workspace": with toggleWorkspaceOnRefocus that would
+                ; go back to the previous workspace when it is the focused one already.
+                Glaze("focus --container-id " info.id)
+                WmLog("opened on its own workspace " ws ": " WindowProcessName(hwnd))
+            }
+            throw Error("placed")
+        }
         if !HoverPlace || MonitorGetCount() < 2
             throw Error("placement off")
         ; Where GlazeWM lays it out, not where it is this instant: PrePlaceOnShow may have

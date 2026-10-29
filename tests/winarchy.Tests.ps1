@@ -647,6 +647,29 @@ Describe 'AutoHotkey settings ini' {
         Write-AhkIni @{} (BaseCfg @{ openOnHoveredMonitor = $false })
         IniText | Should -Match 'openOnHoveredMonitor=0'
     }
+    It 'opens new windows on the focused workspace, or leaves them to Windows with "primary"' {
+        $Generated = Join-Path $TestDrive ([guid]::NewGuid())
+        Write-AhkIni @{} (BaseCfg @{})
+        IniText | Should -Match '(?m)^newWindowsOn=hovered'
+        $Generated = Join-Path $TestDrive ([guid]::NewGuid())
+        Write-AhkIni @{} (BaseCfg @{ newWindowsOn = 'focused' })
+        IniText | Should -Match '(?m)^newWindowsOn=focused'
+        IniText | Should -Match 'openOnHoveredMonitor=1'
+        $Generated = Join-Path $TestDrive ([guid]::NewGuid())
+        Write-AhkIni @{} (BaseCfg @{ newWindowsOn = 'primary' })
+        IniText | Should -Match 'openOnHoveredMonitor=0'
+        Get-NewWindowsOn @{ openOnHoveredMonitor = $false; newWindowsOn = 'focused' } | Should -Be 'primary'
+        Get-NewWindowsOn @{ newWindowsOn = 'nonsense' } | Should -Be 'hovered'
+    }
+    It 'writes workspaceApps as name:workspace pairs, without .exe' {
+        $apps = [ordered]@{ '1' = @('CDViewer.exe', 'wfica32'); '6' = @('ms-teams', ' slack '); '9' = 'Discord'; '7' = @() }
+        ConvertTo-WorkspaceAppsIni $apps | Should -Be 'CDViewer:1|wfica32:1|ms-teams:6|slack:6|Discord:9'
+        ConvertTo-WorkspaceAppsIni @{} | Should -Be ''
+        ConvertTo-WorkspaceAppsIni $null | Should -Be ''
+        $Generated = Join-Path $TestDrive ([guid]::NewGuid())
+        Write-AhkIni @{} (BaseCfg @{ workspaceApps = @{ '4' = @('zen') } })
+        IniText | Should -Match '(?m)^workspaceApps=zen:4'
+    }
     It 'takes the private-window switch from apps.browser when it overrides the default' {
         $Generated = Join-Path $TestDrive ([guid]::NewGuid())
         Write-AhkIni @{ browser = 'C:\c\chrome.exe'; browserPrivate = '--incognito' } (BaseCfg @{ apps = @{ browser = 'C:\ff\firefox.exe' } })

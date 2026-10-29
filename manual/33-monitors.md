@@ -16,7 +16,9 @@ If you've removed a monitor for good, run `winarchy apply -MonitorsOnly -Resplit
 
 ### New windows open where you are
 
-Windows has no idea of a "focused monitor", so it opens every new window on the primary display. Winarchy moves it to the workspace shown under the mouse instead, the way Hyprland opens it on the focused monitor. Dialogs and popups stay with the window that opened them, and games and fullscreen windows are left where they are. `"openOnHoveredMonitor": false` turns this off.
+Windows has no idea of a "focused monitor", so it opens every new window on the primary display. Winarchy moves it to the workspace shown under the mouse instead, the way Hyprland opens it on the focused monitor. Dialogs and popups stay with the window that opened them, and games and fullscreen windows are left where they are. Working from the keyboard, `"newWindowsOn": "focused"` opens it on the workspace you are focused on instead, wherever the mouse is; `"primary"` (or `"openOnHoveredMonitor": false`) turns this off.
+
+To give apps workspaces of their own, list them in `workspaceApps`, by process name: `{ "4": ["zen"], "6": ["ms-teams", "slack"] }`. Their windows open there and you go along; their dialogs and popups stay where they are.
 
 ### Scaling
 

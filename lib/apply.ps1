@@ -232,6 +232,29 @@ function Get-CapsLockMode($cfg, $p) {
     ''
 }
 
+# Where a new window opens (config newWindowsOn): "hovered", the monitor under the mouse
+# (or the one keyboard focus moved to since); "focused", GlazeWM's focused workspace, for
+# working from the keyboard; "primary", where Windows puts it. openOnHoveredMonitor: false,
+# from before newWindowsOn, still means "primary".
+function Get-NewWindowsOn($cfg) {
+    if ($cfg.openOnHoveredMonitor -eq $false) { return 'primary' }
+    if ($cfg.newWindowsOn -in 'focused', 'primary') { return $cfg.newWindowsOn }
+    'hovered'
+}
+
+# Config workspaceApps ({ "4": ["zen"], "6": ["ms-teams", "slack"] }) as the ini's
+# name:workspace|... (winarchy.ahk AppWorkspace), process names without .exe.
+function ConvertTo-WorkspaceAppsIni($apps) {
+    if (-not $apps) { return '' }
+    $pairs = foreach ($ws in $apps.Keys) {
+        foreach ($name in @($apps[$ws])) {
+            $stem = "$name".Trim() -replace '(?i)\.exe$', ''
+            if ($stem -and "$ws" -notmatch '[|:]' -and $stem -notmatch '[|:]') { "${stem}:$ws" }
+        }
+    }
+    @($pairs) -join '|'
+}
+
 # GlazeWM's hide_method (config altTab). Cloaked windows stay in Windows' Alt+Tab, so with
 # "cloak" it lists every workspace's windows; hidden ones drop out of it, leaving the
 # workspaces on screen.
@@ -286,7 +309,10 @@ function Write-AhkIni($p, $cfg) {
             blockMinimize = [int]($cfg.blockMinimize -ne $false)
             minimizeAllowed = (@($cfg.minimizeAllowed) | Where-Object { $_ }) -join '|'
             gameFocusGuard = [int]($cfg.gameFocusGuard -ne $false)
-            openOnHoveredMonitor = [int]($cfg.openOnHoveredMonitor -ne $false)
+            # Where a new window opens (Get-NewWindowsOn); "primary" = Windows' own, no moving.
+            openOnHoveredMonitor = [int]((Get-NewWindowsOn $cfg) -ne 'primary')
+            newWindowsOn = Get-NewWindowsOn $cfg
+            workspaceApps = ConvertTo-WorkspaceAppsIni $cfg.workspaceApps
             focusFollowsCursor = [int]($cfg.focusFollowsCursor -ne $false)
             # lib/autotile-watch.ps1 runs for auto-tiling or stacked workspaces (AutoTileGuard).
             autoTiling = [int](($cfg.autoTiling.enabled -ne $false) -or @(Get-StackedWorkspaces $cfg).Count)
